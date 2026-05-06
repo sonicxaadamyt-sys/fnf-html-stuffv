@@ -1,0 +1,85 @@
+import funkin.play.notes.notekind.NoteKind;
+
+import funkin.audio.FunkinSound;
+import funkin.play.PlayState;
+import funkin.play.notes.NoteSplash;
+import funkin.play.notes.Strumline;
+import funkin.data.notestyle.NoteStyleRegistry;
+import funkin.Highscore;
+
+class HellNote extends NoteKind
+{
+	var splashData = NoteStyleRegistry.instance.fetchEntry("hellnotes");
+
+	public function new(noteKind:String, description:String = "", ?noteStyleId:String, ?params:Array<NoteKindParam>)
+	{
+		super("trickyhell", "Hell Note (Tricky)", "hellnotes", []);
+	}
+
+	function onNoteIncoming(event)
+	{
+		super.onNoteIncoming(event);
+
+		event.note.lowPriority = true;
+		event.note.flipY = PlayState.instance.playerStrumline.isDownscroll;
+		event.note.offset.x = 45;
+		event.note.offset.y = !PlayState.instance.playerStrumline.isDownscroll ? 150 : 260;
+	}
+
+	function onNoteHit(event:HitNoteScriptEvent)
+	{
+		if (event.judgement == "perfect")
+		{
+    		super.onNoteHit(event);
+			return;
+		}
+
+		Highscore.tallies.totalNotes--;
+
+		event.cancelEvent();
+
+		FunkinSound.playOnce(Paths.sound("burnSound"));
+		PlayState.instance.health -= 0.45;
+		PlayState.instance.playerStrumline.killNote(event.note);
+
+		playNoteSplash(event);
+	}
+
+	function onNoteMiss(event:NoteScriptEvent)
+	{
+		Highscore.tallies.totalNotes--;
+		
+		event.cancelEvent();
+	}
+
+	public function playNoteSplash(event):Void
+	{
+		if (!PlayState.instance.playerStrumline.showNotesplash) return;
+
+		var splash:NoteSplash = this.constructNoteSplash(splashData);
+
+		if (splash != null)
+		{
+			splash.play(event.note.noteData.getDirection());
+
+			splash.x = PlayState.instance.playerStrumline.x;
+			splash.x += PlayState.instance.playerStrumline.getXPos(event.note.noteData.getDirection());
+			splash.x += Strumline.INITIAL_OFFSET;
+			splash.x += splashData.getSplashOffsets()[0] * splash.scale.x;
+
+			splash.y = PlayState.instance.playerStrumline.y;
+			splash.y -= Strumline.INITIAL_OFFSET;
+			splash.y += splashData.getSplashOffsets()[1] * splash.scale.y;
+		}
+	}
+
+	function constructNoteSplash(noteKindStyle):NoteSplash
+	{
+		var result:NoteSplash = null;
+
+		result = new NoteSplash(noteKindStyle);
+		PlayState.instance.playerStrumline.add(result);
+
+		return result;
+	}
+}

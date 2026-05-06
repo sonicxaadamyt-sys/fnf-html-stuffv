@@ -1,0 +1,196 @@
+import flixel.FlxG;
+import flixel.math.FlxBasePoint;
+import funkin.audio.FunkinSound;
+import funkin.Conductor;
+import funkin.graphics.FunkinSprite;
+import funkin.modding.module.ScriptedModule;
+import funkin.Paths;
+import funkin.play.PlayState;
+import funkin.play.song.Song;
+
+import flixel.tweens.FlxEase;
+import flixel.tweens.FlxTween;
+import flixel.util.FlxTimer;
+
+import funkin.FunkinMemory;
+import funkin.modding.module.ModuleHandler;
+
+class ExpurgationSong extends Song
+{
+	var trickySpawnSound:FunkinSound;
+	var trickyGlitchSound:FunkinSound;
+	var gremlin:ScriptedModule;
+
+	static var timerResetter:Array<FlxTimer> = [];
+
+	public function new()
+	{
+		super("expurgation");
+	}
+
+	function onResume(e)
+	{
+		super.onResume(e);
+
+		FlxTween.globalManager.forEach((tween:FlxTween) -> tween.active = true);
+		FlxTimer.globalManager.forEach((timer:FlxTimer) -> timer.active = true);
+	}
+
+	function onPause(e)
+	{
+		super.onPause(e);
+
+		FlxTween.globalManager.forEach((tween:FlxTween) -> tween.active = false);
+		FlxTimer.globalManager.forEach((timer:FlxTimer) -> timer.active = false);
+	}
+
+	function onCreate(event:ScriptEvent)
+	{
+		super.onCreate(event);
+
+		////////////////////////////
+		//FunkinMemory CANT HANDLE
+		var cccc:FunkinSprite = FunkinSprite.createSparrow(0, 0, "mechanics/Sign_Post_Mechanic");
+		cccc.animation.addByPrefix("sign", "Signature Stop Sign 1", 24, false);
+		cccc.animation.play("sign");
+		cccc.cameras = [PlayState.instance.camHUD];
+    	cccc.zIndex = 1500;
+		cccc.alpha = 0.000001;
+		PlayState.instance.add(cccc);
+
+		var cccc2:FunkinSprite = FunkinSprite.createSparrow(0, 0, "mechanics/HP GREMLIN");
+		cccc2.animation.addByIndices("come", "HP Gremlin ANIMATION", [0, 1], "", 24, false);
+		cccc2.animation.play("come");
+		cccc2.cameras = [PlayState.instance.camHUD];
+    	cccc2.zIndex = 1500;
+		cccc2.alpha = 0.000001;
+		PlayState.instance.add(cccc2);
+
+		var cccc3:FunkinSprite = FunkinSprite.createSparrow(0, 0, "notes/NOTE_death");
+		cccc3.animation.addByPrefix("sign", "Green Arrow", 24, false);
+		cccc3.animation.play("sign");
+		cccc3.cameras = [PlayState.instance.camHUD];
+    	cccc3.zIndex = 1500;
+		cccc3.alpha = 0.000001;
+		PlayState.instance.add(cccc3);
+		//////////////////////////////
+
+		FunkinMemory.cacheSound(Paths.sound("death", "shared"));
+
+		FunkinMemory.cacheSound(Paths.sound("expurgation/Trickyspawn", "shared"));
+		FunkinMemory.cacheSound(Paths.sound("expurgation/TrickyGlitch", "shared"));
+
+		var playerNotesX = PlayState.instance.playerStrumline.x + PlayState.instance.playerStrumline.getXPos(3);
+
+		var wall:FunkinSprite = FunkinSprite.create(playerNotesX + 200, -200, 'bgs/expurgation/lolz');
+		wall.setGraphicSize(Std.int(wall.width * 1.0));
+		wall.cameras = [PlayState.instance.camHUD];
+		wall.zIndex = 1700;
+		PlayState.instance.add(wall);
+		PlayState.instance.refresh();
+
+		gremlin = ModuleHandler.getModule("ExpurgationGremlin");
+	}
+
+  	public override function onCountdownStart(event:CountdownScriptEvent):Void
+	{
+		if (!PlayState.instance.isInCutscene)
+		{
+      		event.cancelEvent();
+
+      		playCutscene();
+		}
+	}
+
+  function playCutscene(event)
+	{
+		var pre:Float = Conductor.instance.beatLengthMs * -10;
+		Conductor.instance.update(pre);
+
+    PlayState.instance.currentStage.getDad().alpha = 0;
+
+		PlayState.instance.isInCutscene = true;
+
+		var camPosDAD:FlxBasePoint = PlayState.instance.currentStage.getDad().cameraFocusPoint;
+
+		trickySpawnSound = FunkinSound.load(Paths.sound("expurgation/Trickyspawn"));
+		trickyGlitchSound = FunkinSound.load(Paths.sound("expurgation/TrickyGlitch"));
+		PlayState.instance.tweenCameraToPosition(camPosDAD.x, camPosDAD.y, 0.7, FlxEase.sineOut);
+
+		var spawnAnim = FunkinSprite.createSparrow(700, 240, "bgs/expurgation/EXENTER", "clown");
+		spawnAnim.animation.addByPrefix("start", "Entrance", 24, false);
+		PlayState.instance.add(spawnAnim);
+
+		spawnAnim.animation.play("start");
+
+		trickySpawnSound.play();
+
+		spawnAnim.animation.callback = function(name:String, frameNumber:Int, frameIndex:Int)
+		{
+			if (frameIndex == 24)
+				trickyGlitchSound.play();
+		};
+
+		spawnAnim.animation.finishCallback = function(pog:String)
+		{
+			trickyGlitchSound.fadeOut();
+			PlayState.instance.currentStage.getDad().alpha = 1;
+			PlayState.instance.remove(spawnAnim);
+			PlayState.instance.startCountdown();
+			PlayState.instance.isInCutscene = false;
+
+			for (timer in timerResetter) {
+				timer.cancel();
+				timer = null;
+			}
+			// im pissed because i HAVE to cancel out the timer using an array
+			// making the timer STATIC doesn't make it actually static.
+			// so, SOMEHOW it creates another timer when i do this
+			//                         \/
+			var gremlinTimer:FlxTimer = new FlxTimer().start(25, function(tmr:FlxTimer)
+			{
+				if (Conductor.instance.currentStep < 2400)
+				{
+					if (PlayState.instance.health >= 1.5)
+						gremlin.appear(40, 3);
+					tmr.reset(25);
+				}
+			});
+			timerResetter.push(gremlinTimer);
+		}
+	}
+
+  function onSongRetry(event:ScriptEvent)
+	{
+    PlayState.instance.currentStage.getDad().alpha = 0;
+
+		gremlin.forcedDisappear();
+		var signMeh = ModuleHandler.getModule("ExpurgationSign");
+		signMeh.leaveTheScreen();
+
+		super.onSongRetry(event);
+	}
+
+	function onNoteHit(event:HitNoteScriptEvent)
+	{
+    super.onNoteHit(event);
+
+    if (event.judgement == "bad" || event.judgement == "shit")
+		{
+			// Cute and clean - PurSnake
+			gremlin.addToTotalDamage((event.judgement == "bad") ? 0.06 : 0.2);
+			gremlin.disappear();
+		}
+	}
+
+	function onNoteMiss(event:NoteScriptEvent)
+	{
+    super.onNoteMiss(event);
+
+		if (event.note.noteData.kind != "trickydeath")
+		{
+			gremlin.addToTotalDamage(0.075);
+			gremlin.disappear();
+		}
+	}
+}

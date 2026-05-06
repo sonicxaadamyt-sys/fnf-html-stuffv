@@ -1,0 +1,44 @@
+import funkin.play.notes.notekind.NoteKind;
+
+import funkin.audio.FunkinSound;
+import funkin.play.PlayState;
+import funkin.play.notes.Strumline;
+import funkin.Highscore;
+
+class DeathNote extends NoteKind
+{
+	public function new(noteKind:String, description:String = "", ?noteStyleId:String, ?params:Array<NoteKindParam>)
+	{
+		super("trickydeath", "Death Note (Tricky)", "deathnotes", []);
+	}
+
+	function onNoteIncoming(event)
+	{
+		super.onNoteIncoming(event);
+
+		event.note.lowPriority = true;
+		event.note.offset.y = 90;
+	}
+
+	function onNoteMiss(event:NoteScriptEvent)
+	{
+		Highscore.tallies.totalNotes--;
+
+		event.cancel();
+	}
+
+	function onNoteHit(event:HitNoteScriptEvent)
+	{
+		if (event.judgement == "perfect")
+		{
+    		super.onNoteHit(event);
+			return;
+		}
+
+		event.cancel();
+
+		PlayState.instance.playerStrumline.killNote(event.note);
+		FunkinSound.playOnce(Paths.sound("death"));
+		PlayState.instance.health = -1;
+	}
+}
